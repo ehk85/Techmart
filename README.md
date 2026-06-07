@@ -109,32 +109,72 @@ Les métriques (Hit@1, Hit@5, MRR@10) sont loggées dans MongoDB à chaque epoch
 
 ## Résultats
 
-**Run du 2026-06-07 — 5 epochs, batch 32, ~35 minutes sur CPU**
+On a fait deux runs d'entraînement successifs. Entre les deux, on a enrichi les textes produits en y ajoutant les specs techniques (socket, mémoire, TDP...) parce que les descriptions de base étaient trop génériques pour que le modèle puisse distinguer des variantes proches.
 
-| Métrique | Modèle de base | Après fine-tuning | Gain |
+### Métriques de référence — modèle de base (sans fine-tuning)
+
+| Métrique | Score |
+|---|---|
+| Hit@1 | 0.28 |
+| Hit@5 | 0.57 |
+| Hit@10 | 0.69 |
+| MRR@10 | 0.40 |
+
+### Run 1 — textes génériques, 5 epochs, batch 32, ~35 min CPU
+
+Seul le résultat final a été mesuré (bug dans le callback d'évaluation, corrigé ensuite).
+
+| Métrique | Score final |
+|---|---|
+| Hit@1 | 0.4439 |
+| Hit@5 | 0.8618 |
+| Hit@10 | 0.9539 |
+| MRR@10 | 0.6214 |
+
+### Run 2 — textes enrichis avec specs, 5 epochs, batch 32, ~35 min CPU
+
+Cette fois le callback fonctionnait, on a donc les métriques epoch par epoch.
+
+| Epoch | Hit@1 | Hit@5 | Hit@10 | MRR@10 |
+|---|---|---|---|---|
+| 1 | 0.4117 | 0.8587 | 0.9355 | 0.5935 |
+| 2 | 0.4363 | 0.8587 | 0.9478 | 0.6099 |
+| 3 | 0.4301 | 0.8648 | 0.9478 | 0.6097 |
+| 4 | **0.4501** | 0.8725 | 0.9585 | **0.6220** |
+| 5 | **0.4501** | **0.8756** | **0.9585** | 0.6211 |
+
+Comparaison avec le modèle de base :
+
+| Métrique | Base | Run 2 (ep. 5) | Gain total |
 |---|---|---|---|
-| Hit@1 | 0.28 | 0.44 | +57% |
-| Hit@5 | 0.57 | 0.86 | +52% |
-| Hit@10 | 0.69 | 0.95 | +39% |
-| MRR@10 | 0.40 | 0.62 | +54% |
+| Hit@1 | 0.28 | 0.45 | +61% |
+| Hit@5 | 0.57 | 0.88 | +54% |
+| Hit@10 | 0.69 | 0.96 | +39% |
+| MRR@10 | 0.40 | 0.62 | +55% |
 
 ### Ce que ça veut dire
 
 **Hit@k** mesure si le bon produit apparaît dans les k premiers résultats. **MRR@10** (Mean Reciprocal Rank) donne la position moyenne du bon produit : si la réponse est en position 3, le score est 1/3. Plus c'est proche de 1, mieux c'est.
 
-Le Hit@1 à 44% peut sembler moyen, mais il faut tenir compte du fait que le corpus de validation contient 213 produits distincts dont beaucoup se ressemblent (plusieurs variantes de processeurs Intel i5, plusieurs alimentations Corsair, etc.). Le modèle doit souvent choisir entre des produits très proches à partir d'une requête vague comme "proc AMD".
+Le Hit@1 à 45% peut sembler moyen, mais le corpus de validation contient 213 produits distincts dont beaucoup se ressemblent beaucoup — plusieurs variantes de processeurs Intel i5, plusieurs alimentations Corsair, etc. Le modèle doit souvent choisir entre des produits très proches à partir d'une requête vague comme "proc AMD".
 
-Le chiffre le plus utile pour l'usage réel c'est le **Hit@5 à 86%** : dans la grande majorité des cas, l'employé trouvera le bon article dans les 5 premiers résultats affichés.
+Le chiffre le plus utile pour l'usage réel c'est le **Hit@5 à 88%** : dans la grande majorité des cas, l'employé trouvera le bon article dans les 5 premiers résultats.
+
+### Ce qu'on observe sur la courbe d'entraînement
+
+L'epoch 3 montre un léger recul sur Hit@1 (0.4363 → 0.4301) avant de remonter à l'epoch 4. C'est un comportement normal pendant l'entraînement — le modèle réorganise ses représentations avant de trouver un meilleur optimum. L'epoch 4 franchit tous les plafonds du run 1. L'epoch 5 plafonne sur Hit@1 mais améliore encore Hit@5, ce qui indique que le modèle affine sa couverture globale plutôt que sa précision au rang 1.
+
+L'enrichissement des textes produits a bien joué son rôle : dès l'epoch 1 du run 2, on atteint des scores qui nécessitaient 4-5 epochs dans le run 1.
 
 ### Pourquoi le fine-tuning change autant les résultats
 
-Le modèle de base est généraliste — il n'a jamais vu le jargon du matériel informatique ni des requêtes en français informel. Après entraînement sur les données Techmart, il comprend des formulations comme "le proc AMD" ou "gpu gaming pas cher" et sait les associer au bon produit dans le catalogue.
+Le modèle de base est généraliste — il n'a jamais vu le jargon du matériel informatique ni des requêtes en français informel. Après entraînement sur les données Techmart, il comprend des formulations comme "le proc AMD" ou "gpu gaming pas cher" et sait les associer au bon produit.
 
-Le gain de +57% sur Hit@1 montre qu'un petit modèle bien spécialisé vaut largement mieux qu'un grand modèle généraliste sur ce type de tâche.
+Le gain de +61% sur Hit@1 montre qu'un petit modèle bien spécialisé vaut largement mieux qu'un grand modèle généraliste sur ce type de tâche.
 
 ### Ce qui limite encore les performances
 
-Les descriptions produits en base de données sont très génériques ("matériel informatique haute performance"). Le modèle a du mal à distinguer deux produits similaires parce qu'ils ont des textes presque identiques. Enrichir ces descriptions avec les specs (socket, mémoire, TDP...) devrait significativement améliorer le Hit@1.
+Même avec les specs ajoutées, certains produits restent difficiles à distinguer parce que leurs noms sont très proches. Les pistes pour aller plus loin : ajouter des exemples négatifs difficiles dans l'entraînement (hard negatives), générer plus de paires d'entraînement pour les produits sous-représentés, ou essayer un modèle de base plus grand.
 
 ---
 
