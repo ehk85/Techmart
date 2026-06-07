@@ -1,0 +1,67 @@
+# Environnement
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Modèles IA (fichiers lourds)
+*.bin
+*.pt
+*.pth
+*.gguf
+*.safetensors
+*.onnx
+*.pkl
+*.h5
+models/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+logs/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs
+.idea/
+.vscode/settings.json
+.vscode/launch.json
+*.swp
+*.swo
+
+# Streamlit cache
+.streamlit/secrets.toml
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Données locales / exports volumineux
+data/raw/
+*.csv
+*.parquet
+*.sqlite
